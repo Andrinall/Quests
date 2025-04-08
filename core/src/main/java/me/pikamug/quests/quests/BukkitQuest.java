@@ -702,62 +702,67 @@ public class BukkitQuest implements Quest {
                 }
             }
         }
-        if (cancelled) {
-            return;
-        }
-        quester.hardQuit(this);
-        final ConcurrentSkipListSet<Quest> completedQuests = quester.getCompletedQuests();
-        completedQuests.add(this);
-        quester.setCompletedQuests(completedQuests);
-        for (final Map.Entry<Integer, Quest> entry : quester.getTimers().entrySet()) {
-            if (entry.getValue().getName().equals(getName())) {
-                plugin.getServer().getScheduler().cancelTask(entry.getKey());
-                quester.getTimers().remove(entry.getKey());
-            }
-        }
-        if (player.isOnline()) {
-            final Player p = (Player)player;
-            final String[] ps = BukkitConfigUtil.parseStringWithPossibleLineBreaks(ChatColor.AQUA
-                    + finished, this, p);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> p.sendMessage(ps), 40);
-        }
-        if (planner.getCooldown() > -1) {
-            quester.getCompletedTimes().put(this, System.currentTimeMillis());
-            if (quester.getAmountsCompleted().containsKey(this)) {
-                quester.getAmountsCompleted().put(this, quester.getAmountsCompleted().get(this) + 1);
-            } else {
-                quester.getAmountsCompleted().put(this, 1);
-            }
-        }
-        
-        // Issue rewards
-        final BukkitDependencies depends = plugin.getDependencies();
-        boolean issuedReward = false;
-        if (rewards.getMoney() > 0 && depends.getVaultEconomy() != null) {
-            depends.getVaultEconomy().depositPlayer(player, rewards.getMoney());
-            issuedReward = true;
-            if (plugin.getConfigSettings().getConsoleLogging() > 2) {
-                plugin.getLogger().info(player.getUniqueId() + " was rewarded "
-                        + depends.getVaultEconomy().format(rewards.getMoney()));
-            }
-        }
-        if (player.isOnline()) {
-            for (final ItemStack i : rewards.getItems()) {
-                try {
-                    BukkitInventoryUtil.addItem(player.getPlayer(), i);
-                } catch (final Exception e) {
-                    plugin.getLogger().severe("Unable to add null reward item to inventory of " 
-                            + player.getName() + " upon completion of quest " + name);
-                    quester.sendMessage(ChatColor.RED + "Quests encountered a problem with an item. "
-                            + "Please contact an administrator.");
+
+
+        if (!cancelled) {
+            quester.hardQuit(this);
+            final ConcurrentSkipListSet<Quest> completedQuests = quester.getCompletedQuests();
+            completedQuests.add(this);
+            quester.setCompletedQuests(completedQuests);
+            for (final Map.Entry<Integer, Quest> entry : quester.getTimers().entrySet()) {
+                if (entry.getValue().getName().equals(getName())) {
+                    plugin.getServer().getScheduler().cancelTask(entry.getKey());
+                    quester.getTimers().remove(entry.getKey());
                 }
+            }
+            
+            if (player.isOnline() && !finished.isEmpty()) {
+                final Player p = (Player)player;
+                final String[] ps = BukkitConfigUtil.parseStringWithPossibleLineBreaks(ChatColor.AQUA
+                        + finished, this, p);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> p.sendMessage(ps), 40);
+            }
+
+            if (planner.getCooldown() > -1) {
+                quester.getCompletedTimes().put(this, System.currentTimeMillis());
+                if (quester.getAmountsCompleted().containsKey(this)) {
+                    quester.getAmountsCompleted().put(this, quester.getAmountsCompleted().get(this) + 1);
+                } else {
+                    quester.getAmountsCompleted().put(this, 1);
+                }
+            }
+        
+            // Issue rewards
+            final BukkitDependencies depends = plugin.getDependencies();
+            boolean issuedReward = false;
+            if (rewards.getMoney() > 0 && depends.getVaultEconomy() != null) {
+                depends.getVaultEconomy().depositPlayer(player, rewards.getMoney());
                 issuedReward = true;
                 if (plugin.getConfigSettings().getConsoleLogging() > 2) {
-                    plugin.getLogger().info(player.getUniqueId() + " was rewarded " + i.getType().name() + " x " 
-                            + i.getAmount());
+                    plugin.getLogger().info(player.getUniqueId() + " was rewarded "
+                            + depends.getVaultEconomy().format(rewards.getMoney()));
+                }
+            }
+
+            if (player.isOnline()) {
+                for (final ItemStack i : rewards.getItems()) {
+                    try {
+                        BukkitInventoryUtil.addItem(player.getPlayer(), i);
+                    } catch (final Exception e) {
+                        plugin.getLogger().severe("Unable to add null reward item to inventory of " 
+                                + player.getName() + " upon completion of quest " + name);
+                        quester.sendMessage(ChatColor.RED + "Quests encountered a problem with an item. "
+                                + "Please contact an administrator.");
+                    }
+                    issuedReward = true;
+                    if (plugin.getConfigSettings().getConsoleLogging() > 2) {
+                        plugin.getLogger().info(player.getUniqueId() + " was rewarded " + i.getType().name() + " x " 
+                                + i.getAmount());
+                    }
                 }
             }
         }
+
         for (final String s : rewards.getCommands()) {
             if (player.getName() == null) {
                 continue;
